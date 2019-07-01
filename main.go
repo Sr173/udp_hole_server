@@ -33,7 +33,7 @@ func dealWithUdpGetMsg(conn *net.UDPConn, udpAddr *net.UDPAddr, msg string) {
 		if msg[0] == '1' {
 			conn.WriteToUDP([]byte("1"+userAddr.conn.String()), udpAddr)
 		} else if msg[0] == '2' { //想要打洞
-			print("接收到用户[", udpAddr.String(), "]的打洞请求，打洞目标", userAddr.co0nn.String())
+			print("接收到用户[", udpAddr.String(), "]的打洞请求，打洞目标", userAddr.conn.String())
 			conn.WriteToUDP([]byte("2"+udpAddr.String()), &userAddr.conn)
 		}
 		clientMap[user] = userAddr
