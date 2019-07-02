@@ -6,10 +6,20 @@ import (
 	"time"
 )
 
+type userNatType int
+
+const (
+	FullCone = iota
+	RestrictedCone
+	PortRestrictedCone
+	Symmetric
+)
+
 type peerInfomation struct {
 	lastUpdateTime int64
 	conn           net.UDPAddr
 	isHole         bool
+	natType        userNatType
 }
 
 var clientMap map[string]peerInfomation
@@ -21,6 +31,8 @@ func dealWithUdpGetMsg(conn *net.UDPConn, udpAddr *net.UDPAddr, msg string) {
 		var temp peerInfomation
 		temp.conn = *udpAddr
 		temp.lastUpdateTime = time.Now().Unix()
+		temp.natType = (userNatType)(msg[len(msg)-1] - '0')
+		fmt.Println("Nat Type:", temp.natType)
 		clientMap[user] = temp
 		_, _ = conn.WriteToUDP([]byte("0"+udpAddr.String()), udpAddr)
 	} else {
@@ -40,11 +52,25 @@ func dealWithUdpGetMsg(conn *net.UDPConn, udpAddr *net.UDPAddr, msg string) {
 	}
 }
 
+func newUdpConn(conn *net.UDPConn) {
+	var buf [200]byte
+	for {
+		msgLength, raddr, err := conn.ReadFromUDP(buf[0:])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		go dealWithUdpGetMsg(conn, raddr, string(buf[0:msgLength]))
+	}
+}
+
 func main() {
 
 	clientMap = make(map[string]peerInfomation)
 
 	udpAddr, err := net.ResolveUDPAddr("udp", ":543")
+	udpAddr1, err := net.ResolveUDPAddr("udp", ":544")
 
 	if err != nil {
 		fmt.Print("bind error")
@@ -57,15 +83,15 @@ func main() {
 		return
 	}
 
-	var buf [200]byte
-	for {
-		msgLength, raddr, err := conn.ReadFromUDP(buf[0:])
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+	conn1, err := net.ListenUDP("udp", udpAddr1)
 
-		go dealWithUdpGetMsg(conn, raddr, string(buf[0:msgLength]))
+	if err != nil {
+		fmt.Print(err)
+		return
 	}
+	go newUdpConn(conn1)
+
+	fmt.Println("服务器已经开始运行!")
+	newUdpConn(conn)
 
 }
