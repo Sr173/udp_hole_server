@@ -24,6 +24,19 @@ func websocketReader(conn *websocket.Conn, id uint64) {
 		if err != nil {
 			UserMapMutex.Lock()
 			close(UserMap[id].websocketWriteChan)
+			currenctForwardPort, _ := UserMap[id]
+			currenctForwardPortStr := (&currenctForwardPort.udpForwardAddr).String()
+			tepUdp, ok := UdpConnMapClient[currenctForwardPortStr]
+			if ok {
+				delete(UdpConnMapClient, currenctForwardPortStr)
+				delete(UdpConnMapServer, tepUdp.String())
+			} else {
+				tepUdp, ok := UdpConnMapServer[currenctForwardPortStr]
+				if ok {
+					delete(UdpConnMapServer, currenctForwardPortStr)
+					delete(UdpConnMapClient, tepUdp.String())
+				}
+			}
 			delete(UserMap, id)
 			UserMapMutex.Unlock()
 			fmt.Println("user is disconnect:", id, ", current user num:", len(UserMap))
@@ -99,6 +112,68 @@ func websocketReader(conn *websocket.Conn, id uint64) {
 			}
 
 			targetUser.websocketWriteChan <- string(buf)
+			break
+		case SJFrowardInformation:
+			forwardInfo := ForwardInformation{UdpForwardPort}
+			tempConnJson, _ := json.Marshal(forwardInfo)
+			connJson, _ := json.Marshal(JsonSend{SJFrowardInformation, string(tempConnJson), SENoError})
+			currentUser.websocketWriteChan <- string(connJson)
+			break
+		case SJForwardRequest:
+			targetUserId, err := res.Get("Data").Get("TargetUserId").Uint64()
+			if err != nil {
+				fmt.Println("get targetUserId id error:", err)
+				continue
+			}
+
+			//先查询目标用户
+			targetUser, ok := UserMap[targetUserId]
+			if !ok {
+				fmt.Println("target currentUser id is incorrect")
+				continue
+			}
+			connReq := ForwardRequest{currentUser.UserId}
+			tempReqJson, _ := json.Marshal(connReq)
+			connJson, _ := json.Marshal(JsonSend{SJForwardRequest, string(tempReqJson), SENoError})
+			targetUser.websocketWriteChan <- string(connJson)
+			break
+		case SJForwardConnectReady:
+			targetJsonString, err := res.Get("Data").String()
+
+			if err != nil {
+				fmt.Println("get data error:", err)
+				continue
+			}
+
+			resJson, err := simplejson.NewJson([]byte(targetJsonString))
+
+			if err != nil {
+				fmt.Println("get data error:", err)
+				continue
+			}
+
+			targetUserId, err := resJson.Get("TargetUserId").Uint64()
+
+			if err != nil {
+				fmt.Println("get targetUserId id error:", err)
+				continue
+			}
+
+			fmt.Println("user ready to receive:", currentUser.UserId, "target user id:", targetUserId)
+
+			//先查询目标用户
+			targetUser, ok := UserMap[targetUserId]
+			if !ok {
+				fmt.Println("target currentUser id is incorrect")
+				continue
+			}
+
+			//这时候已经可以开始转发了
+			UdpConnMapClient[currentUser.udpForwardAddr.String()] = targetUser.udpForwardAddr
+			UdpConnMapClient[targetUser.udpForwardAddr.String()] = currentUser.udpForwardAddr
+
+			targetUser.websocketWriteChan <- string(buf)
+			break
 		}
 
 	}
