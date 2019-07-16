@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var UdpForwardPort = "4444"
+var UdpForwardPort = "5917"
 
 var UdpConnMapClient = make(map[string]net.UDPAddr)
 var UdpConnMapServer = make(map[string]net.UDPAddr)
