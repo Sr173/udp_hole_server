@@ -56,6 +56,7 @@ func UdpForwardHandler(port string) {
 				currentUser.udpForwardAddr = *raddr
 				UserMap[userId] = currentUser
 
+				fmt.Println("User:", userId, "update the information")
 				//这时候给他返回一个更新成功的Json
 				forInfo := ForwardPortUpdate{time.Now().Unix()}
 				strjson, _ := json.Marshal(forInfo)
