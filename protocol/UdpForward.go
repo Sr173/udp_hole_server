@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,8 @@ var UdpForwardPort = "5917"
 
 var UdpConnMapClient = make(map[string]net.UDPAddr)
 var UdpConnMapServer = make(map[string]net.UDPAddr)
+
+var UdpConnMutex sync.RWMutex
 
 func UdpForwardHandler(port string) {
 	udpAddr, err := net.ResolveUDPAddr("udp", ":"+port)
@@ -33,7 +36,7 @@ func UdpForwardHandler(port string) {
 			fmt.Println(err)
 			continue
 		}
-
+		UdpConnMutex.RLock()
 		//先查找Client的Map
 		targetAddr, ok := UdpConnMapClient[raddr.String()]
 		//如果没有找到
@@ -42,6 +45,7 @@ func UdpForwardHandler(port string) {
 			targetAddr, ok = UdpConnMapServer[raddr.String()]
 			//如果都没找到
 			if !ok {
+				UdpConnMutex.RUnlock()
 				//可能是胡乱发的包
 				if msgLength != 8 {
 					continue
@@ -62,9 +66,11 @@ func UdpForwardHandler(port string) {
 				strjson, _ := json.Marshal(forInfo)
 				sendjson, _ := json.Marshal(JsonSend{SJForwardPortUpdate, string(strjson), SENoError})
 				currentUser.websocketWriteChan <- string(sendjson)
+				continue
 			}
 		}
-
+		UdpConnMutex.RUnlock()
+		fmt.Println("receive the:", raddr, "forward to ", (&targetAddr).String())
 		//这里就进入转发阶段了
 		conn.WriteToUDP(buf[0:msgLength], &targetAddr)
 	}
