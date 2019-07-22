@@ -17,6 +17,23 @@ var UdpConnMapServer = make(map[string]net.UDPAddr)
 
 var UdpConnMutex sync.RWMutex
 
+func UdpForwardDisconnect(key string) {
+
+	UdpConnMutex.Lock()
+	tepUdp, ok := UdpConnMapClient[key]
+	if !ok {
+		tepUdp, ok = UdpConnMapServer[key]
+	}
+
+	delete(UdpConnMapClient, key)
+	delete(UdpConnMapServer, key)
+
+	delete(UdpConnMapClient, tepUdp.String())
+	delete(UdpConnMapServer, tepUdp.String())
+	UdpConnMutex.Unlock()
+
+}
+
 func UdpForwardHandler(port string) {
 	udpAddr, err := net.ResolveUDPAddr("udp", ":"+port)
 	if err != nil {

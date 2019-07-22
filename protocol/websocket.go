@@ -26,17 +26,8 @@ func websocketReader(conn *websocket.Conn, id uint64) {
 			close(UserMap[id].websocketWriteChan)
 			currenctForwardPort, _ := UserMap[id]
 			currenctForwardPortStr := (&currenctForwardPort.udpForwardAddr).String()
-			tepUdp, ok := UdpConnMapClient[currenctForwardPortStr]
-			if ok {
-				delete(UdpConnMapClient, currenctForwardPortStr)
-				delete(UdpConnMapServer, tepUdp.String())
-			} else {
-				tepUdp, ok := UdpConnMapServer[currenctForwardPortStr]
-				if ok {
-					delete(UdpConnMapServer, currenctForwardPortStr)
-					delete(UdpConnMapClient, tepUdp.String())
-				}
-			}
+			UdpForwardDisconnect(currenctForwardPortStr)
+			fmt.Println()
 			delete(UserMap, id)
 			UserMapMutex.Unlock()
 			fmt.Println("user is disconnect:", id, ", current user num:", len(UserMap))
@@ -169,10 +160,17 @@ func websocketReader(conn *websocket.Conn, id uint64) {
 			}
 
 			//这时候已经可以开始转发了
-			UdpConnMapClient[currentUser.udpForwardAddr.String()] = targetUser.udpForwardAddr
-			UdpConnMapClient[targetUser.udpForwardAddr.String()] = currentUser.udpForwardAddr
+			UdpConnMutex.Lock()
+			UdpConnMapClient[(&currentUser.udpForwardAddr).String()] = targetUser.udpForwardAddr
+			UdpConnMapServer[(&targetUser.udpForwardAddr).String()] = currentUser.udpForwardAddr
+			UdpConnMutex.Unlock()
+
+			fmt.Println("connect the:", targetUser.udpForwardAddr, "=>", currentUser.udpForwardAddr)
 
 			targetUser.websocketWriteChan <- string(buf)
+			break
+		case SJForwardDisconnect:
+			UdpForwardDisconnect((&currentUser.udpForwardAddr).String())
 			break
 		}
 

@@ -70,6 +70,7 @@ const (
 	SJForwardRequest
 	SJForwardPortUpdate
 	SJForwardConnectReady
+	SJForwardDisconnect
 )
 
 type ServerErrorCode int
